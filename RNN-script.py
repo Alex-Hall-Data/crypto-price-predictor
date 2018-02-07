@@ -35,7 +35,7 @@ close_price_data=btc_data['close']
 
 
 # Num of steps in batch (also used for prediction steps into the future)
-num_time_steps = 14
+num_time_steps = 28
 
 #split into batches of 'num_time_Steps +1' days (the last element will be the y_true for the relevant batch)
 data_batches=list() #list of 2 week batches to be used as train/test set
