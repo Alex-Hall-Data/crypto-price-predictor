@@ -12,13 +12,15 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn import model_selection
 from random import shuffle
+from random import randint
+import random
 
 
 
 # ### The Data
 
 # In[2]:
-raw_data = pd.read_csv("C:\\Users\\alex.hall\\Documents\\_git\\crypto-price-predictor\\crypto-markets.csv")
+raw_data = pd.read_csv("C:\\Users\\Alex\\Documents\\GitHub\\crypto-predictor\\crypto-price-predictor\\crypto-markets.csv")
 
 btc_data = raw_data[raw_data['symbol']=="BTC"]
 
@@ -37,24 +39,31 @@ num_time_steps = 14
 
 #split into batches of 'num_time_Steps +1' days (the last element will be the y_true for the relevant batch)
 data_batches=list() #list of 2 week batches to be used as train/test set
+data_batches_shifted=list() #shift by 1 day to get y values
 i=0
 while (i < len(close_price_data)-num_time_steps-1):
     data_batches.append((close_price_data.ix[i:(i+num_time_steps)]))
     i=i+1
 
 data_batches=np.asarray(data_batches)
-data_batches=np.random.permutation(data_batches) # shuffle array
 
 
-x_train,x_test = model_selection.train_test_split(data_batches,test_size=0.2)
+i=1
+while (i < len(close_price_data)-num_time_steps):
+    data_batches_shifted.append((close_price_data.ix[i:(i+num_time_steps)]))
+    i=i+1
+
+data_batches_shifted=np.asarray(data_batches_shifted)
+
+
 
 #keep unscaled sets for now (may be useful later)
-x_train_unscaled=x_train
-x_test_unscaled=x_test
+data_batches_unscaled=data_batches
+
 
 #scale each batch relative to max value
-def scale_batch(batch):
-    batch_max=max(batch)
+def scale_batch(batch,shifted_batch):
+    batch_max=max(np.concatenate([batch,shifted_batch]))
     scaled_batch=list()
     for i in range(0,len(batch)):
         scaled_batch.append(batch[i]/batch_max)
@@ -62,46 +71,43 @@ def scale_batch(batch):
     return scaled_batch
         
 
-
-for i in range(0,len(x_train)):
-    x_train[i]=scale_batch(x_train[i])
+data_batches_normalised=np.empty(shape=np.shape(data_batches))
+for i in range(0,len(data_batches)):
+    data_batches_normalised[i]=scale_batch(data_batches[i],data_batches_shifted[i])
     
-for i in range(0,len(x_test)):
-    x_test[i]=scale_batch(x_test[i])
+data_batches_shifted_normalised=np.empty(shape=np.shape(data_batches_shifted))
+for i in range(0,len(data_batches_shifted)):
+    data_batches_shifted_normalised[i]=scale_batch(data_batches_shifted[i],data_batches[i])
 
+
+
+
+
+
+
+#x_train,x_test = model_selection.train_test_split(data_batches,test_size=0.2)
 
 # In[6]:
-#populate y_true arrays
+#MAKE TRAIN AND TEST SET 
+train_indices=random.sample(range(0,len(data_batches_normalised)),int(0.8*len(data_batches_normalised)))
 
-y_train=np.empty(shape=(len(x_train)))
-for i in range(0,len(x_train)):
-    y_train[i]=x_train[i][num_time_steps]
-    
-y_test=np.empty(shape=(len(x_test)))
-for i in range(0,len(x_test)):
-    y_test[i]=x_test[i][num_time_steps]
+x_train=data_batches_normalised[train_indices]
+x_test=np.delete(data_batches_normalised,train_indices,0)
+y_train=data_batches_shifted_normalised[train_indices]
+y_test=np.delete(data_batches_shifted_normalised,train_indices,0)
 
 
-#remove the y_true values from the input data
-X_train=np.empty(shape=(len(x_train),num_time_steps))
-X_test=np.empty(shape=(len(x_test),num_time_steps))
-for i in range(0,len(x_train)):
-    X_train[i]=np.delete(x_train[i],[len(x_train[i])-1])
-    
-y_test=np.empty(shape=(len(x_test)))
-for i in range(0,len(x_test)):
-    X_test[i]=np.delete(x_test[i],[len(x_test[i])-1])
 
 
 # In[8]:
 #pick a random training instance and plot it
 
-train_inst = x_train[np.random.randint(len(X_train))]
+#train_inst = x_train[np.random.randint(len(X_train))]
 
 
-plt.plot(list(range(0,num_time_steps+1)),train_inst)
-plt.title("random training instance")
-plt.tight_layout()
+#plt.plot(list(range(0,num_time_steps+1)),train_inst)
+#plt.title("random training instance")
+#plt.tight_layout()
 
 
 # # Creating the Model
@@ -126,7 +132,7 @@ num_outputs = 1
 # learning rate, 0.0001 default, but you can play with this
 learning_rate = 0.0001
 # how many iterations to go through (training steps), you can play with this
-num_train_iterations = len(X_train)
+num_train_iterations = len(x_train)
 # Size of the batch of data
 batch_size = 1
 
@@ -136,8 +142,8 @@ batch_size = 1
 # In[13]:
 
 
-X = tf.placeholder(tf.float32, [None,num_time_steps,num_inputs])
-y = tf.placeholder(tf.float32, [None,1,num_outputs])
+X = tf.placeholder(tf.float32, [None,num_time_steps+1,num_inputs])
+y = tf.placeholder(tf.float32, [None,num_time_steps+1,num_outputs])
 
 
 # ____
@@ -204,7 +210,7 @@ outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 # In[20]:
 
 
-loss = tf.reduce_mean(tf.square(outputs - y)) # MSE
+loss = tf.sqrt(tf.reduce_mean(tf.square(outputs - y))) # RMSE
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train = optimizer.minimize(loss)
 
@@ -241,14 +247,18 @@ with tf.Session() as sess:
     
     for iteration in range(num_train_iterations):
         
-        X_batch = np.reshape(X_train[iteration],(batch_size,num_time_steps,num_inputs))
-        y_batch = np.reshape(y_train[iteration],(batch_size,1,num_outputs))
+        X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps+1,num_inputs))
+        y_batch = np.reshape(y_train[iteration],(batch_size,num_time_steps+1,num_outputs))
         sess.run(train, feed_dict={X: X_batch, y: y_batch})
         
         if iteration % 10 == 0:
             
-            mse = loss.eval(feed_dict={X: X_batch, y: y_batch})
-            print(iteration, "\tMSE:", mse)
+            rmse = loss.eval(feed_dict={X: X_batch, y: y_batch})
+            print(iteration, "\tMSE:", rmse)
+            
+            #accuracy on test set
+            test_rmse=loss.eval(feed_dict={X: np.reshape(x_test,( np.shape(x_test)[0],np.shape(x_test)[1],1)),y:np.reshape(y_test,( np.shape(y_test)[0],np.shape(y_test)[1],1))})
+            print(iteration, "\tMSE on test:", test_rmse)
     
     # Save Model for Later
     saver.save(sess, "./rnn_time_series_model")
@@ -257,36 +267,32 @@ with tf.Session() as sess:
 
 
 
-
-
-
-
-
-# ### Predicting a time series t+1
+# ### Predicting a time series 
 
 # In[27]:
 
 
 with tf.Session() as sess:                          
     saver.restore(sess, "./rnn_time_series_model")   
-
-    X_new = np.sin(np.array(train_inst[:-1].reshape(-1, num_time_steps, num_inputs)))
+    
+    random_selection=randint(0,len(x_test))
+    X_new = np.reshape(x_test[random_selection],(1,num_time_steps+1,num_inputs))
+    y_true = np.reshape(y_test[random_selection],(1,num_time_steps+1,1))
     y_pred = sess.run(outputs, feed_dict={X: X_new})
 
 
 # In[28]:
+#plot example prediction
 
+plt.title("Testing Example")
 
-plt.title("Testing Model")
-
-# Training Instance
-plt.plot(train_inst[:-1], np.sin(train_inst[:-1]), "bo", markersize=15,alpha=0.5, label="Training Instance")
+# Test Instance
+plt.plot(list(range(0,num_time_steps+1)),X_new[0],label="Input")
+plt.plot(list(range(1,num_time_steps+2)), y_true[0],label="Actual")
 
 # Target to Predict
-plt.plot(train_inst[1:], np.sin(train_inst[1:]), "ko", markersize=10, label="target")
+plt.plot(list(range(1,num_time_steps+2)), y_pred[0], label="Predicted")
 
-# Models Prediction
-plt.plot(train_inst[1:], y_pred[0,:,0], "r.", markersize=10, label="prediction")
 
 plt.xlabel("Time")
 plt.legend()
@@ -294,51 +300,11 @@ plt.tight_layout()
 
 
 # # Generating New Sequences
-# ** Note: Can give wacky results sometimes, like exponential growth**
+
 
 # In[29]:
-
-
+#evaluate performance on test set
 with tf.Session() as sess:
-    saver.restore(sess, "./rnn_time_series_model")
-
-    # SEED WITH ZEROS
-    zero_seq_seed = [0. for i in range(num_time_steps)]
-    for iteration in range(len(ts_data.x_data) - num_time_steps):
-        X_batch = np.array(zero_seq_seed[-num_time_steps:]).reshape(1, num_time_steps, 1)
-        y_pred = sess.run(outputs, feed_dict={X: X_batch})
-        zero_seq_seed.append(y_pred[0, -1, 0])
-
-
-# In[31]:
-
-
-plt.plot(ts_data.x_data, zero_seq_seed, "b-")
-plt.plot(ts_data.x_data[:num_time_steps], zero_seq_seed[:num_time_steps], "r", linewidth=3)
-plt.xlabel("Time")
-plt.ylabel("Value")
-
-
-# In[33]:
-
-
-with tf.Session() as sess:
-    saver.restore(sess, "./rnn_time_series_model")
-
-    # SEED WITH Training Instance
-    training_instance = list(ts_data.y_true[:30])
-    for iteration in range(len(training_instance) -num_time_steps):
-        X_batch = np.array(training_instance[-num_time_steps:]).reshape(1, num_time_steps, 1)
-        y_pred = sess.run(outputs, feed_dict={X: X_batch})
-        training_instance.append(y_pred[0, -1, 0])
-
-
-# In[37]:
-
-
-plt.plot(ts_data.x_data, ts_data.y_true, "b-")
-plt.plot(ts_data.x_data[:num_time_steps],training_instance[:num_time_steps], "r-", linewidth=3)
-plt.xlabel("Time")
-
-
-# # Great Job!
+    saver.restore(sess, "./rnn_time_series_model")  
+    
+    
