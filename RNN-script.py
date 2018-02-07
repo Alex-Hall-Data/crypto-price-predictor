@@ -1,7 +1,10 @@
 
 # coding: utf-8
 
-# # RNN with TensorFlow API
+# # TODO:
+#the graphs at the end look prett but remember the only number we are interested in is the final day - only use this as th basis for decisions
+#for each test set element, record the actual and predicted % change
+#start hyperparameter tuning
 
 # In[1]:
 
@@ -29,7 +32,8 @@ btc_data=btc_data.ix[:,['date','open','close']]
 btc_data['change_percent']=(btc_data['close']-btc_data['open'])/btc_data['open']
 
 #for now we'll just take the daily close price and predict the next day's close
-close_price_data=btc_data['close']
+close_price_data=np.array(btc_data['close'])###
+
 
 # In[5]:
 
@@ -42,7 +46,7 @@ data_batches=list() #list of 2 week batches to be used as train/test set
 data_batches_shifted=list() #shift by 1 day to get y values
 i=0
 while (i < len(close_price_data)-num_time_steps-1):
-    data_batches.append((close_price_data.ix[i:(i+num_time_steps)]))
+    data_batches.append((close_price_data[i:(i+num_time_steps)]))
     i=i+1
 
 data_batches=np.asarray(data_batches)
@@ -50,7 +54,7 @@ data_batches=np.asarray(data_batches)
 
 i=1
 while (i < len(close_price_data)-num_time_steps):
-    data_batches_shifted.append((close_price_data.ix[i:(i+num_time_steps)]))
+    data_batches_shifted.append((close_price_data[i:(i+num_time_steps)]))
     i=i+1
 
 data_batches_shifted=np.asarray(data_batches_shifted)
@@ -142,8 +146,8 @@ batch_size = 1
 # In[13]:
 
 
-X = tf.placeholder(tf.float32, [None,num_time_steps+1,num_inputs])
-y = tf.placeholder(tf.float32, [None,num_time_steps+1,num_outputs])
+X = tf.placeholder(tf.float32, [None,num_time_steps,num_inputs])
+y = tf.placeholder(tf.float32, [None,num_time_steps,num_outputs])
 
 
 # ____
@@ -210,7 +214,7 @@ outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 # In[20]:
 
 
-loss = tf.sqrt(tf.reduce_mean(tf.square(outputs - y))) # RMSE
+loss = tf.sqrt(tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0][num_time_steps-1][0]))) # RMSE - minimised for the last day of the series (ie the unknown one)
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train = optimizer.minimize(loss)
 
@@ -247,8 +251,8 @@ with tf.Session() as sess:
     
     for iteration in range(num_train_iterations):
         
-        X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps+1,num_inputs))
-        y_batch = np.reshape(y_train[iteration],(batch_size,num_time_steps+1,num_outputs))
+        X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps,num_inputs))
+        y_batch = np.reshape(y_train[iteration],(batch_size,num_time_steps,num_outputs))
         sess.run(train, feed_dict={X: X_batch, y: y_batch})
         
         if iteration % 10 == 0:
@@ -276,8 +280,8 @@ with tf.Session() as sess:
     saver.restore(sess, "./rnn_time_series_model")   
     
     random_selection=randint(0,len(x_test))
-    X_new = np.reshape(x_test[random_selection],(1,num_time_steps+1,num_inputs))
-    y_true = np.reshape(y_test[random_selection],(1,num_time_steps+1,1))
+    X_new = np.reshape(x_test[random_selection],(1,num_time_steps,num_inputs))
+    y_true = np.reshape(y_test[random_selection],(1,num_time_steps,1))
     y_pred = sess.run(outputs, feed_dict={X: X_new})
 
 
@@ -287,24 +291,22 @@ with tf.Session() as sess:
 plt.title("Testing Example")
 
 # Test Instance
-plt.plot(list(range(0,num_time_steps+1)),X_new[0],label="Input")
-plt.plot(list(range(1,num_time_steps+2)), y_true[0],label="Actual")
+plt.plot(list(range(0,num_time_steps)),X_new[0],label="Input")
+plt.plot(list(range(1,num_time_steps+1)), y_true[0],label="Actual")
 
 # Target to Predict
-plt.plot(list(range(1,num_time_steps+2)), y_pred[0], label="Predicted")
+plt.plot(list(range(1,num_time_steps+1)), y_pred[0], label="Predicted")
 
 
 plt.xlabel("Time")
 plt.legend()
 plt.tight_layout()
 
+axes = plt.gca()
+axes.set_ylim([min(y_true[0])[0],1])
 
-# # Generating New Sequences
 
 
-# In[29]:
-#evaluate performance on test set
-with tf.Session() as sess:
-    saver.restore(sess, "./rnn_time_series_model")  
-    
+
+
     
