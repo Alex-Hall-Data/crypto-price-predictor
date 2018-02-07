@@ -130,7 +130,7 @@ num_neurons = 100
 # Just one output, predicted time series
 num_outputs = 1
 # learning rate, 0.0001 default, but you can play with this
-learning_rate = 0.0001
+learning_rate = 0.001
 # how many iterations to go through (training steps), you can play with this
 num_train_iterations = len(x_train)
 # Size of the batch of data
@@ -155,43 +155,43 @@ y = tf.placeholder(tf.float32, [None,num_time_steps+1,num_outputs])
 # In[14]:
 
 
-cell = tf.contrib.rnn.OutputProjectionWrapper(
-    tf.contrib.rnn.BasicRNNCell(num_units=num_neurons, activation=tf.nn.relu),
-    output_size=num_outputs)
+#cell = tf.contrib.rnn.OutputProjectionWrapper(
+#    tf.contrib.rnn.BasicRNNCell(num_units=num_neurons, activation=tf.nn.relu),
+#    output_size=num_outputs)
 
 
 # In[15]:
 
 
-# cell = tf.contrib.rnn.OutputProjectionWrapper(
-#     tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu),
-#     output_size=num_outputs)
+#cell = tf.contrib.rnn.OutputProjectionWrapper(
+#    tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu),
+#    output_size=num_outputs)
 
 
 # In[16]:
 
 
-# n_neurons = 100
-# n_layers = 3
+n_neurons = 100
+n_layers = 3
 
-# cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
-#           for layer in range(n_layers)])
+cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
+           for layer in range(n_layers)]),output_size=num_outputs)
 
 
 # In[17]:
 
 
-# cell = tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu)
+#cell = tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu)
 
 
 # In[18]:
 
 
-# n_neurons = 100
-# n_layers = 3
+#n_neurons = 100
+#n_layers = 3
 
-# cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicLSTMCell(num_units=n_neurons)
-#           for layer in range(n_layers)])
+#cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicLSTMCell(num_units=n_neurons)
+#          for layer in range(n_layers)])
 
 
 # _____
@@ -254,11 +254,11 @@ with tf.Session() as sess:
         if iteration % 10 == 0:
             
             rmse = loss.eval(feed_dict={X: X_batch, y: y_batch})
-            print(iteration, "\tMSE:", rmse)
+            print(iteration, "\tRMSE:", rmse)
             
             #accuracy on test set
             test_rmse=loss.eval(feed_dict={X: np.reshape(x_test,( np.shape(x_test)[0],np.shape(x_test)[1],1)),y:np.reshape(y_test,( np.shape(y_test)[0],np.shape(y_test)[1],1))})
-            print(iteration, "\tMSE on test:", test_rmse)
+            print(iteration, "\tRMSE on test:", test_rmse)
     
     # Save Model for Later
     saver.save(sess, "./rnn_time_series_model")
