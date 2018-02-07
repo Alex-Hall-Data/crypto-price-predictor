@@ -171,11 +171,11 @@ y = tf.placeholder(tf.float32, [None,num_time_steps+1,num_outputs])
 # In[16]:
 
 
-n_neurons = 100
-n_layers = 3
+#n_neurons = 100
+#n_layers = 3
 
-cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
-           for layer in range(n_layers)]),output_size=num_outputs)
+#cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
+#           for layer in range(n_layers)]),output_size=num_outputs)
 
 
 # In[17]:
@@ -187,11 +187,11 @@ cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.co
 # In[18]:
 
 
-#n_neurons = 100
-#n_layers = 3
+n_neurons = 100
+n_layers = 3
 
-#cell = tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicLSTMCell(num_units=n_neurons)
-#          for layer in range(n_layers)])
+cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicLSTMCell(num_units=n_neurons)
+          for layer in range(n_layers)]),output_size=num_outputs)
 
 
 # _____
