@@ -20,7 +20,6 @@ from random import randint
 import random
 
 
-
 # ### The Data
 
 # In[2]:
@@ -30,10 +29,10 @@ btc_data = raw_data[raw_data['symbol']=="BTC"]
 
 #this may come in handy later
 btc_data=btc_data.ix[:,['date','open','close']]
-btc_data['change_percent']=(btc_data['close']-btc_data['open'])/btc_data['open']
+btc_data['change_percent']=100*(btc_data['close']-btc_data['open'])/btc_data['open']
 
-#for now we'll just take the daily close price and predict the next day's close
-close_price_data=np.array(btc_data['close'])###
+#for now we'll just take the daily change and predict the next day's change
+close_price_data=np.array(btc_data['change_percent'])###
 
 
 # In[5]:
@@ -41,6 +40,7 @@ close_price_data=np.array(btc_data['close'])###
 
 # Num of steps in batch (also used for prediction steps into the future)
 num_time_steps = 28
+scale_data=False
 
 #split into batches of 'num_time_Steps +1' days (the last element will be the y_true for the relevant batch)
 data_batches=list() #list of 2 week batches to be used as train/test set
@@ -81,16 +81,19 @@ def scale_true(shifted_batch,batch):
     scaled_y=shifted_batch/batch_max
     return scaled_y
     
-
-data_batches_normalised=np.empty(shape=np.shape(data_batches))
-for i in range(0,len(data_batches)):
-    data_batches_normalised[i]=scale_batch(data_batches[i],data_batches_shifted[i])
+if(scale_data==True):
     
-data_batches_shifted_normalised=np.empty(shape=np.shape(data_batches_shifted))
-for i in range(0,len(data_batches_shifted)):
-    data_batches_shifted_normalised[i]=scale_true(data_batches_shifted[i],data_batches[i])
+    data_batches_normalised=np.empty(shape=np.shape(data_batches))
+    for i in range(0,len(data_batches)):
+        data_batches_normalised[i]=scale_batch(data_batches[i],data_batches_shifted[i])
+    
+    data_batches_shifted_normalised=np.empty(shape=np.shape(data_batches_shifted))
+    for i in range(0,len(data_batches_shifted)):
+        data_batches_shifted_normalised[i]=scale_true(data_batches_shifted[i],data_batches[i])
 
-
+else:
+    data_batches_normalised=data_batches
+    data_batches_shifted_normalised=data_batches_shifted
 
 
 # In[6]:
@@ -136,7 +139,7 @@ num_neurons = 100
 # Just one output, predicted time series
 num_outputs = 1
 # learning rate, 0.0001 default, but you can play with this
-learning_rate = 0.001
+learning_rate = 0.0001
 # how many iterations to go through (training steps), you can play with this
 num_train_iterations = len(x_train)
 # Size of the batch of data
@@ -169,19 +172,19 @@ y = tf.placeholder(tf.float32, [None,1,num_outputs])
 # In[15]:
 
 
-cell = tf.contrib.rnn.OutputProjectionWrapper(
-    tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu),
-    output_size=num_outputs)#num_outputs
+#cell = tf.contrib.rnn.OutputProjectionWrapper(
+#    tf.contrib.rnn.BasicLSTMCell(num_units=num_neurons, activation=tf.nn.relu),
+#    output_size=num_outputs)#num_outputs
 
 
 # In[16]:
 
 
-#n_neurons = 100
-#n_layers = 3
+n_neurons = 100
+n_layers = 20
 
-#cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
-#           for layer in range(n_layers)]),output_size=num_outputs)
+cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
+           for layer in range(n_layers)]),output_size=num_outputs)
 
 
 # In[17]:
@@ -216,7 +219,7 @@ outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 # In[20]:
 
 
-loss = tf.sqrt(tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0]))) # RMSE - minimised for the last day of the series (ie the unknown one)
+loss = tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0])) # RMSE - minimised for the last day of the series (ie the unknown one)
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train = optimizer.minimize(loss)
 
@@ -305,7 +308,7 @@ plt.legend()
 plt.tight_layout()
 
 axes = plt.gca()
-axes.set_ylim([min(X_new[0])[0],1])
+#axes.set_ylim([min(X_new[0])[0],1])
 
 
 
