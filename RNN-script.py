@@ -40,7 +40,7 @@ close_price_data=np.array(btc_data['change_percent'])###
 
 # Num of steps in batch (also used for prediction steps into the future)
 num_time_steps = 28
-scale_data=False
+scale_data=True
 
 #split into batches of 'num_time_Steps +1' days (the last element will be the y_true for the relevant batch)
 data_batches=list() #list of 2 week batches to be used as train/test set
@@ -180,8 +180,8 @@ y = tf.placeholder(tf.float32, [None,1,num_outputs])
 # In[16]:
 
 
-n_neurons = 100
-n_layers = 20
+n_neurons = 200
+n_layers = 10
 
 cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
            for layer in range(n_layers)]),output_size=num_outputs)
@@ -220,8 +220,15 @@ outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 
 
 loss = tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0])) # RMSE - minimised for the last day of the series (ie the unknown one)
-optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-train = optimizer.minimize(loss)
+#optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+#train = optimizer.minimize(loss)
+
+global_step = tf.Variable(0, trainable=False)
+starter_learning_rate = 0.01
+learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step,
+                                           100, 0.96, staircase=True)
+# Passing global_step to minimize() will increment it at each step.
+learning_step = (tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=global_step))
 
 
 # #### Init Variables
@@ -258,7 +265,7 @@ with tf.Session() as sess:
         
         X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps,num_inputs))
         y_batch = np.reshape(y_train[iteration],(batch_size,1,num_outputs))
-        sess.run(train, feed_dict={X: X_batch, y: y_batch})
+        sess.run(learning_step, feed_dict={X: X_batch, y: y_batch})
         
         if iteration % 10 == 0:
             
@@ -288,11 +295,12 @@ with tf.Session() as sess:
     X_new = np.reshape(x_test[random_selection],(1,num_time_steps,num_inputs))
     y_true = np.reshape(y_test[random_selection],(1,1,1))
     y_pred = sess.run(outputs, feed_dict={X: X_new})
-
+    
+    y_pred_list=sess.run(outputs,feed_dict={X:np.reshape(x_test,(len(x_test),np.shape(x_test)[1],1))})
 
 # In[28]:
 #plot example prediction
-
+plt.figure(0)
 plt.title("Testing Example")
 
 # Test Instance
@@ -308,10 +316,18 @@ plt.legend()
 plt.tight_layout()
 
 axes = plt.gca()
-#axes.set_ylim([min(X_new[0])[0],1])
+axes.set_ylim([min(X_new[0])[0],1])
 
 
 
 
-
+predicted_list=list()
+#scatter plot of all predicted vs actuals
+for i in range(0,len(y_pred_list)):
+    predicted_list.append(y_pred_list[i][num_time_steps-1][0]) #take the last one (ie the unknown day)
     
+plt.figure(1)
+plt.title("predicted vs actuals")
+plt.scatter(predicted_list,y_test)
+plt.xlabel("predicted")
+plt.ylabel("actual")
