@@ -1,6 +1,8 @@
 
 # coding: utf-8
 
+#adam with constant low learning rate and cell option 3 provides best result so far
+
 # # TODO:
 #need a custom loss function to maximise profit
 #the graphs at the end look prett but remember the only number we are interested in is the final day - only use this as th basis for decisions
@@ -14,7 +16,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from sklearn import model_selection
+import sklearn
 from random import shuffle
 from random import randint
 import random
@@ -23,7 +25,7 @@ import random
 # ### The Data
 
 # In[2]:
-raw_data = pd.read_csv("C:\\Users\\Alex\\Documents\\GitHub\\crypto-predictor\\crypto-price-predictor\\crypto-markets.csv")
+raw_data = pd.read_csv("C:\\Users\\alex.hall\\Documents\\_git\\crypto-price-predictor\\crypto-markets.csv")
 
 btc_data = raw_data[raw_data['symbol']=="BTC"]
 
@@ -68,18 +70,15 @@ data_batches_unscaled=data_batches
 
 #scale each batch relative to max value
 def scale_batch(batch,shifted_batch):
-    batch_max=max(np.append(batch,shifted_batch))
-    scaled_batch=list()
-    for i in range(0,len(batch)):
-        scaled_batch.append(batch[i]/batch_max)
-    scaled_batch=np.asarray(scaled_batch)
+    all_standardised=sklearn.preprocessing.scale(np.append(batch,shifted_batch))
+    scaled_batch=all_standardised[0:num_time_steps]
     return scaled_batch
 
 #as above but scales the true values
 def scale_true(shifted_batch,batch):
-    batch_max=max(np.append(batch,shifted_batch))
-    scaled_y=shifted_batch/batch_max
-    return scaled_y
+    all_standardised=sklearn.preprocessing.scale(np.append(batch,shifted_batch))
+    scaled_batch=all_standardised[num_time_steps]
+    return scaled_batch
     
 if(scale_data==True):
     
@@ -138,8 +137,7 @@ num_inputs = 1
 num_neurons = 100
 # Just one output, predicted time series
 num_outputs = 1
-# learning rate, 0.0001 default, but you can play with this
-learning_rate = 0.0001
+
 # how many iterations to go through (training steps), you can play with this
 num_train_iterations = len(x_train)
 # Size of the batch of data
@@ -218,17 +216,16 @@ outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 
 # In[20]:
 
-
+learning_rate = 0.00001
 loss = tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0])) # RMSE - minimised for the last day of the series (ie the unknown one)
-#optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-#train = optimizer.minimize(loss)
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+learning_step = optimizer.minimize(loss)
 
-global_step = tf.Variable(0, trainable=False)
-starter_learning_rate = 0.01
-learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step,
-                                           100, 0.96, staircase=True)
+#global_step = tf.Variable(0, trainable=False)
+#decay_steps=1 #decay the rate every step
+#learning_rate = tf.train.inverse_time_decay(learning_rate, global_step,decay_steps, 0.99)
 # Passing global_step to minimize() will increment it at each step.
-learning_step = (tf.train.AdamOptimizer(learning_rate).minimize(loss, global_step=global_step))
+#learning_step = (tf.train.AdadeltaOptimizer(learning_rate).minimize(loss, global_step=global_step))
 
 
 # #### Init Variables
@@ -316,7 +313,7 @@ plt.legend()
 plt.tight_layout()
 
 axes = plt.gca()
-axes.set_ylim([min(X_new[0])[0],1])
+axes.set_ylim([min(X_new[0])[0],max(X_new[0])[0]])
 
 
 
