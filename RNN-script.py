@@ -24,6 +24,7 @@ import random
 from scipy.stats.stats import pearsonr
 
 
+
 # ### The Data
 
 # In[2]:
@@ -40,7 +41,7 @@ close_price_data=np.array(btc_data['change_percent'])###
 
 
 # In[5]:
-
+tf.reset_default_graph()
 
 # Num of steps in batch (also used for prediction steps into the future)
 num_time_steps = 28
@@ -125,7 +126,7 @@ y_test=np.delete(data_batches_shifted_normalised,train_indices,0)
 # In[11]:
 
 
-tf.reset_default_graph()
+#tf.reset_default_graph()
 
 
 # ### Constants
@@ -155,6 +156,32 @@ X = tf.placeholder(tf.float32, [None,num_time_steps,num_inputs])
 y = tf.placeholder(tf.float32, [None,1,num_outputs])
 
 
+#hyperparameter tuning
+#%%
+#tuning parameters
+#start learning rate
+min_k=0.000001
+lr_increment=0.000001
+max_lr=0.0001
+min_neurons=50
+max_neurons=400
+min_layers=2
+max_layers=30
+
+lr_list=list()
+pearson_list=list() # select model with highest value of this
+n_neuron_list=list()
+n_layers_list=list()
+
+#train learning rate on grid
+for k in range(0,10000):
+    
+
+        
+
+#%%
+
+
 # ____
 # ____
 # ### RNN Cell Layer
@@ -180,11 +207,13 @@ y = tf.placeholder(tf.float32, [None,1,num_outputs])
 # In[16]:
 
 
-n_neurons = 200
-n_layers = 10
+        n_neurons = randint(min_neurons,max_neurons)
+        n_neuron_list.append(n_neurons)
+        n_layers = randint(min_layers,max_layers)
+        n_layers_list.append(n_layers)
 
-cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
-           for layer in range(n_layers)]),output_size=num_outputs)
+        cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
+                   for layer in range(n_layers)]),output_size=num_outputs)
 
 
 # In[17]:
@@ -211,31 +240,22 @@ cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.co
 # In[19]:
 
 
-outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
+        outputs, states = tf.nn.dynamic_rnn(cell, X, dtype=tf.float32)
 
 
 # ### Loss Function and Optimizer
 
 # In[20]:
 
-#tuning parameters
-#start learning rate
-k=0.000001
-lr_increment=0.000001
-
-lr_list=list()
-pearson_list=list() # select model with highest value of this
 
 
-for k in range(0.000005,0.0001):
-
-    learning_rate = 0.000015
-    global_step = tf.Variable(0, trainable=False,dtype=tf.int64)
-    loss = tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0])) # RMSE - minimised for the last day of the series (ie the unknown one)
+        learning_rate = random.uniform(min_k,max_lr)
+        global_step = tf.Variable(0, trainable=False,dtype=tf.int64)
+        loss = tf.reduce_mean(tf.square(outputs[0][num_time_steps-1][0] - y[0])) # RMSE - minimised for the last day of the series (ie the unknown one)
 
 #choose one or the other of the following 2 blocks (constant or decaying learning rate)
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-    learning_step = optimizer.minimize(loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        learning_step = optimizer.minimize(loss)
 
 #global_step = tf.Variable(0, trainable=False)
 #decay_steps=1 #decay the rate every step
@@ -249,7 +269,7 @@ for k in range(0.000005,0.0001):
 # In[21]:
 
 
-    init = tf.global_variables_initializer()
+        init = tf.global_variables_initializer()
 
 
 # ## Session
@@ -265,39 +285,39 @@ for k in range(0.000005,0.0001):
 # In[25]:
 
 
-    saver = tf.train.Saver()
+        saver = tf.train.Saver()
 
 # In[26]:
 
 
-    with tf.Session() as sess:
-        sess.run(init)
+        with tf.Session() as sess:
+            sess.run(init)
     
-        loss_list=list()
-        iteration_list=list()
+            loss_list=list()
+            iteration_list=list()
     
-        for iteration in range(num_train_iterations):
+            for iteration in range(num_train_iterations):
         
-            X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps,num_inputs))
-            y_batch = np.reshape(y_train[iteration],(batch_size,1,num_outputs))
-            sess.run(learning_step, feed_dict={X: X_batch, y: y_batch})
+                X_batch = np.reshape(x_train[iteration],(batch_size,num_time_steps,num_inputs))
+                y_batch = np.reshape(y_train[iteration],(batch_size,1,num_outputs))
+                sess.run(learning_step, feed_dict={X: X_batch, y: y_batch})
         
         
         
-            if iteration % 10 == 0:
+                if iteration % 10 == 0:
             
             
-                rmse = loss.eval(feed_dict={X: X_batch, y: y_batch})
+                    rmse = loss.eval(feed_dict={X: X_batch, y: y_batch})
                # print(iteration, "\tRMSE:", rmse)
             
             #accuracy on test set
-                test_rmse=loss.eval(feed_dict={X: np.reshape(x_test,( np.shape(x_test)[0],np.shape(x_test)[1],1)),y:np.reshape(y_test,( np.shape(y_test)[0],1,1))})
+                    test_rmse=loss.eval(feed_dict={X: np.reshape(x_test,( np.shape(x_test)[0],np.shape(x_test)[1],1)),y:np.reshape(y_test,( np.shape(y_test)[0],1,1))})
                # print(iteration, "\tRMSE on test:", test_rmse)
             
-                loss_list.append(test_rmse)
-                iteration_list.append(iteration)
+                    loss_list.append(test_rmse)
+                    iteration_list.append(iteration)
     # Save Model for Later
-        saver.save(sess, "./rnn_time_series_model")
+            saver.save(sess, "./rnn_time_series_model")
 
 
 
@@ -308,59 +328,60 @@ for k in range(0.000005,0.0001):
 # In[27]:
 
 
-    with tf.Session() as sess:                          
-        saver.restore(sess, "./rnn_time_series_model")   
+        with tf.Session() as sess:                          
+            saver.restore(sess, "./rnn_time_series_model")   
     
-        random_selection=randint(0,len(x_test))
-        X_new = np.reshape(x_test[random_selection],(1,num_time_steps,num_inputs))
-        y_true = np.reshape(y_test[random_selection],(1,1,1))
-        y_pred = sess.run(outputs, feed_dict={X: X_new})
+            random_selection=randint(0,len(x_test))
+            X_new = np.reshape(x_test[random_selection],(1,num_time_steps,num_inputs))
+            y_true = np.reshape(y_test[random_selection],(1,1,1))
+            y_pred = sess.run(outputs, feed_dict={X: X_new})
     
-        y_pred_list=sess.run(outputs,feed_dict={X:np.reshape(x_test,(len(x_test),np.shape(x_test)[1],1))})
+            y_pred_list=sess.run(outputs,feed_dict={X:np.reshape(x_test,(len(x_test),np.shape(x_test)[1],1))})
 
 # In[28]:
 #plot example prediction
-    plt.figure(0)
-    plt.title("Testing Example")
+   # plt.figure(0)
+    #plt.title("Testing Example")
 
 # Test Instance
-    plt.plot(list(range(0,num_time_steps)),X_new[0],label="Input")
-    plt.plot(num_time_steps, y_true[0],'ro',label="Actual")
+    #plt.plot(list(range(0,num_time_steps)),X_new[0],label="Input")
+    #plt.plot(num_time_steps, y_true[0],'ro',label="Actual")
 
 # Target to Predict
-    plt.plot(list(range(1,num_time_steps+1)), y_pred[0],'bs', label="Predicted")
+   # plt.plot(list(range(1,num_time_steps+1)), y_pred[0],'bs', label="Predicted")
 
 
-    plt.xlabel("Time")
-    plt.legend()
-    plt.tight_layout()
+   # plt.xlabel("Time")
+    #plt.legend()
+   # plt.tight_layout()
 
-    axes = plt.gca()
-    axes.set_ylim([min(X_new[0])[0],max(X_new[0])[0]])
-
-
+   # axes = plt.gca()
+    #axes.set_ylim([min(X_new[0])[0],max(X_new[0])[0]])
 
 
-    predicted_list=list()
+
+
+        predicted_list=list()
 #scatter plot of all predicted vs actuals
-    for i in range(0,len(y_pred_list)):
-        predicted_list.append(y_pred_list[i][num_time_steps-1][0]) #take the last one (ie the unknown day)
+        for i in range(0,len(y_pred_list)):
+            predicted_list.append(y_pred_list[i][num_time_steps-1][0]) #take the last one (ie the unknown day)
     
-    plt.figure(1)
-    plt.title("predicted vs actuals")
-    plt.scatter(predicted_list,y_test)
-    plt.xlabel("predicted")
-    plt.ylabel("actual")
+   # plt.figure(1)
+   # plt.title("predicted vs actuals")
+   # plt.scatter(predicted_list,y_test)
+   # plt.xlabel("predicted")
+   # plt.ylabel("actual")
 
 
 #plot loss
-    plt.figure(2)
-    plt.title("loss function")
-    plt.plot(iteration_list,loss_list)
+   # plt.figure(2)
+   # plt.title("loss function")
+   # plt.plot(iteration_list,loss_list)
 
 #pearson correlation
-    pearson_list.append(pearsonr(predicted_list,y_test))
-    lr_list.append(k)
-    
-    print(k)
-    k=k+lr_increment
+        pearson_list.append(pearsonr(predicted_list,y_test))
+        lr_list.append(learning_rate)
+        tf.reset_default_graph()
+        
+        print(k)
+        k=k+1
