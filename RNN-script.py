@@ -174,7 +174,7 @@ n_neuron_list=list()
 n_layers_list=list()
 
 #train learning rate on grid
-for k in range(0,10000):
+for k in range(0,1000):
     
 
         
@@ -207,13 +207,13 @@ for k in range(0,10000):
 # In[16]:
 
 
-        n_neurons = randint(min_neurons,max_neurons)
-        n_neuron_list.append(n_neurons)
-        n_layers = randint(min_layers,max_layers)
-        n_layers_list.append(n_layers)
+        n_neurons = 200#randint(min_neurons,max_neurons)
+        #n_neuron_list.append(n_neurons)
+        n_layers = 10#randint(min_layers,max_layers)
+        #n_layers_list.append(n_layers)
 
         cell = tf.contrib.rnn.OutputProjectionWrapper(tf.contrib.rnn.MultiRNNCell([tf.contrib.rnn.BasicRNNCell(num_units=n_neurons)
-                   for layer in range(n_layers)]),output_size=num_outputs)
+                   for layer in range(n_layers)]),output_size=num_outputs)###changed reuse to t
 
 
 # In[17]:
@@ -381,7 +381,7 @@ for k in range(0,10000):
 #pearson correlation
         pearson_list.append(pearsonr(predicted_list,y_test))
         lr_list.append(learning_rate)
-        tf.reset_default_graph()
+        #tf.reset_default_graph()
         
         print(k)
         k=k+1
