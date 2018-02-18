@@ -161,7 +161,7 @@ y = tf.placeholder(tf.float32, [None,1,num_outputs])
 #%%
 #tuning parameters
 #start learning rate
-k=0.000043
+k=0.000049
 
 
 lr_list=list()
@@ -359,16 +359,16 @@ predicted_list=list()
 for i in range(0,len(y_pred_list)):
     predicted_list.append(y_pred_list[i][num_time_steps-1][0]) #take the last one (ie the unknown day)
     
-    plt.figure(1)
-    plt.title("predicted vs actuals")
-    plt.scatter(predicted_list,y_test)
-    plt.xlabel("predicted")
-    plt.ylabel("actual")
+plt.figure(1)
+plt.title("predicted vs actuals")
+plt.scatter(predicted_list,y_test)
+plt.xlabel("predicted")
+plt.ylabel("actual")
 
 #plot loss
-    plt.figure(2)
-    plt.title("loss function")
-    plt.plot(iteration_list,loss_list)
+plt.figure(2)
+plt.title("loss function")
+plt.plot(iteration_list,loss_list)
 
 #pearson correlation
 #pearson_list.append(pearsonr(predicted_list,y_test))
